@@ -11,6 +11,10 @@ Roboteq::MotorController::MotorController()
       motors_flag_command_(std::string("?FM") + endline_command_),
       fault_flag_command_(std::string("?FF") + endline_command_),
       read_period_command_(std::string("# 1.0") + endline_command_),
+      acceleration_command_("!AC"),
+      deceleration_command_("!DC"),
+      speed_command_("!S"),
+      write_period_command_("!MS"),
       motor_controller_readed_bytes_(0),
       motor_controller_readed_data_(""),
       motor_controller_serial_data_("") {
@@ -26,20 +30,27 @@ Roboteq::MotorController::MotorController()
 
     // Parameters
     declare_parameter("roboteq_motor_controller.port_name", "/dev/ttyUSB0");
+    declare_parameter("roboteq_motor_controller.frame_id", "roboteq_motor_controller");
     declare_parameter("roboteq_motor_controller.baudrate", 115200);
     declare_parameter("roboteq_motor_controller.left_motor_direction", 1);
     declare_parameter("roboteq_motor_controller.right_motor_direction", 1);
+    declare_parameter("roboteq_motor_controller.motor_acceleration", 1.0);
+    declare_parameter("roboteq_motor_controller.motor_deceleration", 1.0);
 
     motor_controller_serial_port_name_ = this->get_parameter("roboteq_motor_controller.port_name").as_string();
+    roboteq_motor_controller_frame_id_ = this->get_parameter("roboteq_motor_controller.frame_id").as_string();
     motor_controller_baudrate_ = this->get_parameter("roboteq_motor_controller.baudrate").as_int();
     left_motor_direction_ = this->get_parameter("roboteq_motor_controller.left_motor_direction").as_int();
     right_motor_direction_ = this->get_parameter("roboteq_motor_controller.right_motor_direction").as_int();
+    motor_acceleration_ = this->get_parameter("roboteq_motor_controller.motor_acceleration").as_int();
+    motor_deceleration_ = this->get_parameter("roboteq_motor_controller.motor_deceleartion").as_int();
 
     this->settingBaudrate();
 
     motor_controller_serial_port_ = open(motor_controller_serial_port_name_.c_str(), O_RDWR | O_NOCTTY | O_NDELAY);
     
     // Regex patterns initialize
+    combined_pattern_ = std::regex("(S=(-?\\d+):(-?\\d+))|(A=(-?\\d+):(-?\\d+))|(T=(-?\\d+):(-?\\d+):(-?\\d+))|(FS=(\\d+))|(FM=(\\d+):(\\d+))|(FF=(\\d+))");
     motors_rpm_pattern_ = std::regex("S=(-?\\d+):(-?\\d+)");
     motor_controller_current_pattern_ = std::regex("A=(-?\\d+):(-?\\d+)");
     motor_controller_temperature_pattern_ = std::regex("T=(-?\\d+):(-?\\d+):(-?\\d+)");
@@ -150,7 +161,7 @@ void Roboteq::MotorController::readMotorsAndMotorControllerValues() {
     if(motor_controller_readed_bytes_ > 0) {
         motor_controller_readed_data_ += std::string(motor_controller_read_buffer_, motor_controller_readed_bytes_);
         if(motor_controller_readed_data_.size() >= MOTOR_CONTROLLER_DATA_LIMIT) {
-            
+            motor_controller_serial_data_ = std::regex_replace(motor_controller_readed_data_, std::regex(" "), "");
         }
     } else if(motor_controller_readed_bytes_ == 0) {
         RCLCPP_WARN_STREAM(this->get_logger(), "No data read from the motor controller.");
@@ -162,7 +173,51 @@ void Roboteq::MotorController::readMotorsAndMotorControllerValues() {
 
 
 void Roboteq::MotorController::writeMotorsValues() {
+    write(motor_controller_serial_port_, (acceleration_command_ + " 1 " + std::to_string(motor_acceleration_) + endline_command_).c_str(), (acceleration_command_ + " 1 " + std::to_string(motor_acceleration_) + endline_command_).size());
+    write(motor_controller_serial_port_, (acceleration_command_ + " 2 " + std::to_string(motor_acceleration_) + endline_command_).c_str(), (acceleration_command_ + " 1 " + std::to_string(motor_acceleration_) + endline_command_).size());
 
+    write(motor_controller_serial_port_, (deceleration_command_ + " 1 " + std::to_string(motor_deceleration_) + endline_command_).c_str(), (deceleration_command_ + " 1 " + std::to_string(motor_deceleration_) + endline_command_).size());
+    write(motor_controller_serial_port_, (deceleration_command_ + " 2 " + std::to_string(motor_deceleration_) + endline_command_).c_str(), (deceleration_command_ + " 1 " + std::to_string(motor_deceleration_) + endline_command_).size());
+
+    write(motor_controller_serial_port_, (speed_command_ + " 1 " + std::to_string(rpm_message_to_driver_.left_motor_rpm.data) + endline_command_).c_str(), (speed_command_ + " 1 " + std::to_string(rpm_message_to_driver_.left_motor_rpm.data) + endline_command_).size());
+    write(motor_controller_serial_port_, (speed_command_ + " 1 " + std::to_string(rpm_message_to_driver_.right_motor_rpm.data) + endline_command_).c_str(), (speed_command_ + " 2 " + std::to_string(rpm_message_to_driver_.right_motor_rpm.data) + endline_command_).size());
+}
+
+
+
+void Roboteq::MotorController::parseMotorsAndMotorControllerData() {
+    motor_controller_regex_iterator_start_ = motor_controller_serial_data_.cbegin();
+    motor_controller_regex_iterator_end_ = motor_controller_serial_data_.cend();
+    
+    while(std::regex_search(motor_controller_regex_iterator_start_, motor_controller_regex_iterator_end_, matches_, combined_pattern_)) {
+        if(matches_[1].matched) {
+            // Motors RPM
+            rpm_message_from_driver_.header.stamp = this->get_clock()->now();
+            rpm_message_from_driver_.header.frame_id = roboteq_motor_controller_frame_id_;
+
+            rpm_message_from_driver_.left_motor_rpm.data = std::stoi(matches_[2].str());
+            rpm_message_from_driver_.right_motor_rpm.data = std::stoi(matches_[3].str());
+        } else if(matches_[4].matched) {
+            // Motor controller current (A)
+
+        } else if(matches_[7].matched) {
+            // Motor controller temperature (C)
+
+        } else if(matches_[11].matched) {
+            // Motor controller status flags 
+
+        } else if(matches_[13].matched) {
+            // Motors flags 
+
+        } else if(matches_[16].matched) {
+            // Motor controller fault flags 
+
+        }
+
+        motor_controller_regex_iterator_start_ = matches_[0].second;  
+    }
+
+    motor_controller_rpm_publisher_->publish(rpm_message_from_driver_);
 }
 
 

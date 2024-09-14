@@ -61,11 +61,16 @@ namespace Roboteq
 
             int motor_controller_baudrate_;
 
+            std::string roboteq_motor_controller_frame_id_;
+
             char motor_controller_read_buffer_[MOTOR_CONTROLLER_BUFFER_LENGTH];
 
             int left_motor_direction_, right_motor_direction_;
 
             std::string::const_iterator motor_controller_regex_iterator_start_, motor_controller_regex_iterator_end_;
+
+            std::regex combined_pattern_;
+            std::smatch matches_;
 
             std::regex motors_rpm_pattern_;
             std::smatch motors_rpm_matches_;
@@ -95,10 +100,18 @@ namespace Roboteq
             std::string motors_flag_command_;
             std::string fault_flag_command_;
             std::string read_period_command_;
+
+            std::string acceleration_command_;
+            std::string deceleration_command_;
+            std::string speed_command_;
+            std::string write_period_command_;
             
             int motor_controller_readed_bytes_;
             std::string motor_controller_readed_data_;
             std::string motor_controller_serial_data_;
+
+            int motor_acceleration_;
+            int motor_deceleration_;
 
         protected:
 
@@ -120,6 +133,8 @@ namespace Roboteq
             void readMotorsAndMotorControllerValues(void);
 
             void writeMotorsValues(void);
+
+            void parseMotorsAndMotorControllerData(void);
     };
 }
 
