@@ -22,11 +22,15 @@
 
 // Messages
 #include <roboteq_motor_controller/msg/rpm.hpp>
+#include <roboteq_motor_controller/msg/motor_controller_flags.hpp>
+#include <roboteq_motor_controller/msg/motor_controller_status.hpp>
 
 
-
-#define MOTOR_CONTROLLER_BUFFER_LENGTH 256
-#define MOTOR_CONTROLLER_DATA_LIMIT 500
+#define MOTOR_CONTROLLER_BUFFER_LENGTH                  256
+#define MOTOR_CONTROLLER_DATA_LIMIT                     500
+#define MOTOR_CONTROLLER_STATUS_ARRAY_LENGTH            9
+#define MOTOR_FLAGS_ARRAY_LENGTH                  7
+#define MOTOR_CONTROLLER_FAULT_FLAGS_ARRAY_LENGTH       8
 
 
 
@@ -45,13 +49,35 @@ namespace Roboteq
              */
             rclcpp::Publisher<roboteq_motor_controller::msg::RPM>::SharedPtr motor_controller_rpm_publisher_;
 
+            rclcpp::Publisher<roboteq_motor_controller::msg::MotorControllerFlags>::SharedPtr motor_controller_flags_publisher_;
+
+            rclcpp::Publisher<roboteq_motor_controller::msg::MotorControllerStatus>::SharedPtr motor_controller_status_publisher_;
+
             rclcpp::TimerBase::SharedPtr motor_controller_read_timer_; 
             
             rclcpp::TimerBase::SharedPtr motor_controller_write_timer_;
 
             roboteq_motor_controller::msg::RPM rpm_message_from_driver_;
-
+            
             roboteq_motor_controller::msg::RPM rpm_message_to_driver_;
+
+            roboteq_motor_controller::msg::MotorControllerFlags motor_controller_flags_message_;
+
+            roboteq_motor_controller::msg::MotorControllerStatus motor_controller_status_message_;
+
+            int motor_controller_status_flags_binary_array_[MOTOR_CONTROLLER_STATUS_ARRAY_LENGTH];
+
+            int left_motor_flags_binary_array_[MOTOR_FLAGS_ARRAY_LENGTH];
+
+            int right_motor_flags_binary_array_[MOTOR_FLAGS_ARRAY_LENGTH];   
+
+            int motor_controller_fault_flags_binary_array_[MOTOR_CONTROLLER_FAULT_FLAGS_ARRAY_LENGTH];     
+
+            const std::string status_flags_[MOTOR_CONTROLLER_STATUS_ARRAY_LENGTH];
+            
+            const std::string motor_flags_[MOTOR_FLAGS_ARRAY_LENGTH];
+
+            const std::string fault_flags_[MOTOR_CONTROLLER_FAULT_FLAGS_ARRAY_LENGTH];
 
             struct termios motor_controller_tty_;
 
@@ -135,6 +161,8 @@ namespace Roboteq
             void writeMotorsValues(void);
 
             void parseMotorsAndMotorControllerData(void);
+
+            void convertDecimalToBinaryArrayOfDigits(unsigned int decimal_value, int bit_count, int *binarry_array);
     };
 }
 

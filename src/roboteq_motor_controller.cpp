@@ -3,6 +3,9 @@
 
 Roboteq::MotorController::MotorController()
     : Node("roboteq_motor_controller_node"), 
+      status_flags_{"Setup", "RunScript", "STO", "AtLimit", "StallDetected", "PowerStageOff", "AnalogMode", "PulseMode", "SerialMode"},
+      motor_flags_{"AmpsTriggerActivated", "ReverseLimitTriggered", "ForwardLimitTriggered", "SafetyStopActive", "LoopErrorDetected", "MotorStalled", "AmpsLimitCurrentlyActive"},
+      fault_flags_{"DefaultConfigLoaded", "MosfetFail", "MotorSensorSetupFault", "EmergencyStop", "ShotCircuit", "UnderVoltage", "OverVoltage", "OverHeat"},
       clear_motor_controller_buffer_command_(std::string("# C\r\n") + std::string("#\r\n")),
       speed_query_command_(std::string("?S") + endline_command_),
       current_query_command_(std::string("?A") + endline_command_),
@@ -23,6 +26,8 @@ Roboteq::MotorController::MotorController()
 
     // Publishers
     motor_controller_rpm_publisher_ = this->create_publisher<roboteq_motor_controller::msg::RPM>("/roboteq_motor_controller/motors_rpm_output", 10);
+    motor_controller_flags_publisher_ = this->create_publisher<roboteq_motor_controller::msg::MotorControllerFlags>("/roboteq_motor_controller/motor_controller_flags", 10);
+    motor_controller_status_publisher_ = this->create_publisher<roboteq_motor_controller::msg::MotorControllerStatus>("/roboteq_motor_controller/motor_controller_status", 10);
 
     // Timers
     motor_controller_read_timer_ = this->create_wall_timer(std::chrono::milliseconds(1), bind(&MotorController::readMotorsAndMotorControllerValues, this));
@@ -42,8 +47,8 @@ Roboteq::MotorController::MotorController()
     motor_controller_baudrate_ = this->get_parameter("roboteq_motor_controller.baudrate").as_int();
     left_motor_direction_ = this->get_parameter("roboteq_motor_controller.left_motor_direction").as_int();
     right_motor_direction_ = this->get_parameter("roboteq_motor_controller.right_motor_direction").as_int();
-    motor_acceleration_ = this->get_parameter("roboteq_motor_controller.motor_acceleration").as_int();
-    motor_deceleration_ = this->get_parameter("roboteq_motor_controller.motor_deceleartion").as_int();
+    motor_acceleration_ = this->get_parameter("roboteq_motor_controller.motor_acceleration").as_double();
+    motor_deceleration_ = this->get_parameter("roboteq_motor_controller.motor_deceleration").as_double();
 
     this->settingBaudrate();
 
@@ -162,6 +167,8 @@ void Roboteq::MotorController::readMotorsAndMotorControllerValues() {
         motor_controller_readed_data_ += std::string(motor_controller_read_buffer_, motor_controller_readed_bytes_);
         if(motor_controller_readed_data_.size() >= MOTOR_CONTROLLER_DATA_LIMIT) {
             motor_controller_serial_data_ = std::regex_replace(motor_controller_readed_data_, std::regex(" "), "");
+            this->parseMotorsAndMotorControllerData();
+            motor_controller_readed_data_ = "";
         }
     } else if(motor_controller_readed_bytes_ == 0) {
         RCLCPP_WARN_STREAM(this->get_logger(), "No data read from the motor controller.");
@@ -189,35 +196,86 @@ void Roboteq::MotorController::parseMotorsAndMotorControllerData() {
     motor_controller_regex_iterator_start_ = motor_controller_serial_data_.cbegin();
     motor_controller_regex_iterator_end_ = motor_controller_serial_data_.cend();
     
+    rpm_message_from_driver_.header.stamp = this->get_clock()->now();
+    rpm_message_from_driver_.header.frame_id = roboteq_motor_controller_frame_id_;
+
+    motor_controller_status_message_.header.stamp = this->get_clock()->now();
+    motor_controller_status_message_.header.frame_id = roboteq_motor_controller_frame_id_;
+
+    motor_controller_flags_message_.header.stamp = this->get_clock()->now();
+    motor_controller_flags_message_.header.frame_id = roboteq_motor_controller_frame_id_;
+
     while(std::regex_search(motor_controller_regex_iterator_start_, motor_controller_regex_iterator_end_, matches_, combined_pattern_)) {
         if(matches_[1].matched) {
             // Motors RPM
-            rpm_message_from_driver_.header.stamp = this->get_clock()->now();
-            rpm_message_from_driver_.header.frame_id = roboteq_motor_controller_frame_id_;
-
             rpm_message_from_driver_.left_motor_rpm.data = std::stoi(matches_[2].str());
             rpm_message_from_driver_.right_motor_rpm.data = std::stoi(matches_[3].str());
         } else if(matches_[4].matched) {
             // Motor controller current (A)
-            
+            motor_controller_status_message_.left_motor_status.current.amper.data = std::stoi(matches_[5].str()) / 10.0;
+            motor_controller_status_message_.right_motor_status.current.amper.data = std::stoi(matches_[6].str()) / 10.0;
+
         } else if(matches_[7].matched) {
             // Motor controller temperature (C)
+            motor_controller_status_message_.left_motor_status.temperature.celsius.data = std::stoi(matches_[8].str());
+            motor_controller_status_message_.right_motor_status.temperature.celsius.data = std::stoi(matches_[9].str());
 
         } else if(matches_[11].matched) {
             // Motor controller status flags 
+            convertDecimalToBinaryArrayOfDigits(std::stoi(matches_[12].str()), MOTOR_CONTROLLER_STATUS_ARRAY_LENGTH, motor_controller_status_flags_binary_array_);
 
+            for(int i=0; i<MOTOR_CONTROLLER_STATUS_ARRAY_LENGTH; i++) {
+                if(motor_controller_status_flags_binary_array_[i] == 1) {
+                    motor_controller_flags_message_.status_flags.push_back(status_flags_[i]);
+                }
+            }
         } else if(matches_[13].matched) {
             // Motors flags 
+            convertDecimalToBinaryArrayOfDigits(std::stoi(matches_[14].str()), MOTOR_FLAGS_ARRAY_LENGTH, left_motor_flags_binary_array_);
+            convertDecimalToBinaryArrayOfDigits(std::stoi(matches_[15].str()), MOTOR_FLAGS_ARRAY_LENGTH, right_motor_flags_binary_array_);
 
+            for(int i=0; i<MOTOR_FLAGS_ARRAY_LENGTH; i++) {
+                if(left_motor_flags_binary_array_[i] == 1) {
+                    motor_controller_flags_message_.left_motor_flags.push_back(motor_flags_[i]);
+                }
+
+                if(right_motor_flags_binary_array_[i] == 1) {
+                    motor_controller_flags_message_.right_motor_flags.push_back(motor_flags_[i]);
+                }
+            }
         } else if(matches_[16].matched) {
             // Motor controller fault flags 
+            convertDecimalToBinaryArrayOfDigits(std::stoi(matches_[17].str()), MOTOR_CONTROLLER_FAULT_FLAGS_ARRAY_LENGTH, motor_controller_fault_flags_binary_array_);
 
+            for(int i=0; i<MOTOR_CONTROLLER_FAULT_FLAGS_ARRAY_LENGTH; i++) {
+                if(motor_controller_fault_flags_binary_array_[i] == 1){
+                    motor_controller_flags_message_.fault_flags.push_back(fault_flags_[i]);
+                }
+            }
         }
 
         motor_controller_regex_iterator_start_ = matches_[0].second;  
     }
 
     motor_controller_rpm_publisher_->publish(rpm_message_from_driver_);
+    motor_controller_flags_publisher_->publish(motor_controller_flags_message_);
+    motor_controller_status_publisher_->publish(motor_controller_status_message_);
+    
+    motor_controller_flags_message_.status_flags.clear();
+    motor_controller_flags_message_.left_motor_flags.clear();
+    motor_controller_flags_message_.right_motor_flags.clear();
+    motor_controller_flags_message_.fault_flags.clear();
+}
+
+
+
+void Roboteq::MotorController::convertDecimalToBinaryArrayOfDigits(unsigned int decimal_value, int bit_count, int *binary_array) {
+    unsigned int mask = 1U << (bit_count - 1);
+    for(int i=0; i<bit_count; i++)
+    {
+        binary_array[i] = (decimal_value & mask) ? 1 : 0;
+        decimal_value <<= 1;
+    } 
 }
 
 
