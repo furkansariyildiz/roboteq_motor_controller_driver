@@ -199,7 +199,7 @@ void Roboteq::MotorController::parseMotorsAndMotorControllerData() {
             rpm_message_from_driver_.right_motor_rpm.data = std::stoi(matches_[3].str());
         } else if(matches_[4].matched) {
             // Motor controller current (A)
-
+            
         } else if(matches_[7].matched) {
             // Motor controller temperature (C)
 

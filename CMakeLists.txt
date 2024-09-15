@@ -16,6 +16,11 @@ find_package(rosidl_default_generators REQUIRED)
 include_directories(include)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/MotorControllerFlags.msg"
+  "msg/MotorControllerStatus.msg"
+  "msg/MotorCurrent.msg"
+  "msg/MotorStatus.msg"
+  "msg/MotorTemperature.msg"
   "msg/RPM.msg"
   DEPENDENCIES builtin_interfaces std_msgs
 )

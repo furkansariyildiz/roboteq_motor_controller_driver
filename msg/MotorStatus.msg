@@ -1,0 +1,3 @@
+std_msgs/Header header
+roboteq_motor_controller/MotorCurrent current
+roboteq_motor_controller/MotorTemperature temperature 

@@ -1,0 +1,3 @@
+std_msgs/Header header
+roboteq_motor_controller/MotorStatus left_motor_status
+roboteq_motor_controller/MotorStatus right_motor_status
