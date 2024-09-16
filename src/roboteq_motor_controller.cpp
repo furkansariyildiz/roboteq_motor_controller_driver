@@ -69,6 +69,14 @@ Roboteq::MotorController::MotorController()
 
     // System sleep duration
     rclcpp::sleep_for(std::chrono::milliseconds(2000));
+
+    RCLCPP_INFO_STREAM(this->get_logger(), "Port name: " << motor_controller_serial_port_name_);
+    RCLCPP_INFO_STREAM(this->get_logger(), "Frame ID: " << roboteq_motor_controller_frame_id_);
+    RCLCPP_INFO_STREAM(this->get_logger(), "Baudrate: " << motor_controller_baudrate_);
+    RCLCPP_INFO_STREAM(this->get_logger(), "Left Motor Direction: " << left_motor_direction_);
+    RCLCPP_INFO_STREAM(this->get_logger(), "Right Motor Direction: " << right_motor_direction_);
+    RCLCPP_INFO_STREAM(this->get_logger(), "Motor Acceleration: " << motor_acceleration_);
+    RCLCPP_INFO_STREAM(this->get_logger(), "Motor Deceleration: " << motor_deceleration_);
 }
 
 
