@@ -2,6 +2,8 @@
 
 ### Setting the configuration roboteq motor controller parameters
 
+Roboteq Motor Controller Driver for ROS2 (Humble)
+
 ```yaml
 /roboteq_motor_controller_node:
   ros__parameters:
