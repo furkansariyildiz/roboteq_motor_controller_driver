@@ -56,12 +56,6 @@ Roboteq::MotorController::MotorController()
     
     // Regex patterns initialize
     combined_pattern_ = std::regex("(S=(-?\\d+):(-?\\d+))|(A=(-?\\d+):(-?\\d+))|(T=(-?\\d+):(-?\\d+):(-?\\d+))|(FS=(\\d+))|(FM=(\\d+):(\\d+))|(FF=(\\d+))");
-    motors_rpm_pattern_ = std::regex("S=(-?\\d+):(-?\\d+)");
-    motor_controller_current_pattern_ = std::regex("A=(-?\\d+):(-?\\d+)");
-    motor_controller_temperature_pattern_ = std::regex("T=(-?\\d+):(-?\\d+):(-?\\d+)");
-    motor_controller_status_flag_pattern_ = std::regex("FS=(\\d+)");
-    motors_flag_pattern_ = std::regex("FM=(\\d+):(\\d+)");
-    motor_controller_fault_flag_pattern_ = std::regex("FF=(\\d+)");
 
     this->prepareTermios();
     this->clearMotorControllerBuffer();
