@@ -1,7 +1,7 @@
-# roboteq_motor_controller_driver (ROS2)   <img src="documents/roboteq-logo.jpg" style="width: 10%; height: 10%"/><img src="documents/ros2.png" style="width: 10%; height: 10%"/>
+# roboteq_motor_controller_driver (ROS2)   <img src="docs/roboteq-logo.jpg" style="width: 10%; height: 10%"/><img src="docs/ros2.png" style="width: 10%; height: 10%"/>
 
 <p align="center">
-  <img src="documents/roboteq.png" style="width: 50%; height: 50%"/>
+  <img src="docs/roboteq.png" style="width: 50%; height: 50%"/>
 </p>
 
 ### Setting the configuration roboteq motor controller parameters
